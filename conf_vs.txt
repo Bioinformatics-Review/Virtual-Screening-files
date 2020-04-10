@@ -1,0 +1,21 @@
+receptor= cl5_md_703 ns.pdbqt
+ 
+
+center_x= 13.696     
+
+center_y= 18.336
+
+center_z= 43.860 
+
+ 
+
+size_x= 40
+
+size_y= 40
+
+size_z= 40
+
+ 
+
+
+exhaustiveness= 8
