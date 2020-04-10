@@ -14,5 +14,5 @@ for($i=0;$i<@arr_file;$i++)
 {
 	chomp @arr_file[$i];
 	print"@arr_file[$i]\n";
-	system("vina.exe --config conf.txt --ligand @arr_file[$i] --log @arr_file[$i]_log.log");
+	system("vina.exe --config conf_vs.txt --ligand @arr_file[$i] --log @arr_file[$i]_log.log");
 }
