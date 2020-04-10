@@ -1,4 +1,4 @@
-receptor= cl5_md_703 ns.pdbqt
+receptor= protein.pdbqt
  
 
 center_x= 13.696     
