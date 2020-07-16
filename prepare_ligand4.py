@@ -1,3 +1,5 @@
+#This file is a part of Autodock Tools
+
 #!/usr/bin/env python
 #
 # 
