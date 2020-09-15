@@ -4,13 +4,13 @@
 #
 # 
 #
-# $Header: /opt/cvs/python/packages/share1.5/AutoDockTools/Utilities24/prepare_ligand4.py,v 1.10 2010/07/31 00:14:13 rhuey Exp $
+# $Header: /opt/cvs/python/packages/share1.5/AutoDockTools/Utilities24/prepare_ligand.py,v 1.4 2007/10/08 18:12:27 rhuey Exp $
 #
 import os 
 
 from MolKit import Read
 
-from AutoDockTools.MoleculePreparation import AD4LigandPreparation
+from AutoDockTools.MoleculePreparation import LigandPreparation
 
 
 
@@ -21,43 +21,38 @@ if __name__ == '__main__':
 
     def usage():
         "Print helpful, accurate usage statement to stdout."
-        print "Usage: prepare_ligand4.py -l filename"
+        print "Usage: prepare_ligand.py -l filename"
         print
         print "    Description of command..."
-        print "         -l     ligand_filename (.pdb or .mol2 or .pdbq format)"
+        print "         -l     ligand_filename"
         print "    Optional parameters:"
         print "        [-v]    verbose output"
-        print "        [-o pdbqt_filename] (default output filename is ligand_filename_stem + .pdbqt)"
+        print "        [-o pdbq_filename] (output filename)"
         print "        [-d]    dictionary to write types list and number of active torsions "
 
-        print "        [-A]    type(s) of repairs to make:\n\t\t bonds_hydrogens, bonds, hydrogens (default is to do no repairs)"
-        print "        [-C]    do not add charges (default is to add gasteiger charges)"
+        print "        [-A]    type(s) of repairs to make:\n\t\t bonds_hydrogens, bonds, hydrogens, ''"
+        print "        [-C]    preserve initial charges (do not add new charges)"
         print "        [-p]    preserve input charges on atom type, eg -p Zn"
-        print "               (default is not to preserve charges on any specific atom type)"
-        print "        [-U]    cleanup type:\n\t\t nphs_lps, nphs, lps, '' (default is 'nphs_lps') "
-        print "        [-B]    type(s) of bonds to allow to rotate "
-        print "               (default sets 'backbone' rotatable and 'amide' + 'guanidinium' non-rotatable)"
+        print "        [-K]    add Kollman charges"
+        print "        [-U]    cleanup type:\n\t\t nphs_lps, nphs, lps, '' "
+        print "        [-B]    type(s) of bonds to allow to rotate"
         print "        [-R]    index for root"
-        print "        [-F]    check for and use largest non-bonded fragment (default is not to do this)"
-        print "        [-M]    interactive (default is automatic output)"
+        print "        [-F]    check for and use largest non-bonded fragment (False)"
+        print "        [-M]    interactive (default is automatic)"
         print "        [-I]    string of bonds to inactivate composed of "
         print "                   of zero-based atom indices eg 5_13_2_10  "
         print "                   will inactivate atoms[5]-atoms[13] bond "
         print "                               and atoms[2]-atoms[10] bond "
-        print "                      (default is not to inactivate any specific bonds)"
+        print "                      (default is '')"
         print "        [-Z]    inactivate all active torsions     "
-        print "                      (default is leave all rotatable active except amide and guanidinium)"
-        print "        [-g]    attach all nonbonded fragments "
-        print "        [-s]    attach all nonbonded singletons: "
-        print "                   NB: sets attach all nonbonded fragments too"
-        print "                      (default is not to do this)"
+        print "                      (default is leave active)"
 
 
     # process command arguments
     try:
-        opt_list, args = getopt.getopt(sys.argv[1:], 'l:vo:d:A:Cp:U:B:R:MFI:Zgsh')
+        opt_list, args = getopt.getopt(sys.argv[1:], 'l:vo:d:A:Cp:KU:B:R:MFI:Zh')
     except getopt.GetoptError, msg:
-        print 'prepare_ligand4.py: %s' %msg
+        print 'prepare_ligand.py: %s' %msg
         usage()
         sys.exit(2)
 
@@ -67,17 +62,17 @@ if __name__ == '__main__':
     # optional parameters
     verbose = None
     add_bonds = False
-    #-A: repairs to make: add bonds and/or hydrogens
+    #-b: repairs to make: add bonds and/or hydrogens
     repairs = ""
     #-C  default: add gasteiger charges 
     charges_to_add = 'gasteiger'
     #-p preserve charges on specific atom types
     preserve_charge_types=''
+    #-K add_Kollman #no opt
     #-U: cleanup by merging nphs_lps, nphs, lps
     cleanup  = "nphs_lps"
-    #-B named rotatable bond type(s) to allow to rotate
-    #allowed_bonds = ""
-    allowed_bonds = "backbone"
+    #-R rotatable bond type(s) to fix
+    allowed_bonds = ""
     #-r  root
     root = 'auto'
     #-o outputfilename
@@ -88,16 +83,12 @@ if __name__ == '__main__':
     bonds_to_inactivate = ""
     #-Z inactivate_all_torsions
     inactivate_all_torsions = False
-    #-g attach_nonbonded_fragments
-    attach_nonbonded_fragments = False
-    #-s attach_nonbonded_singletons
-    attach_singletons = False
     #-m mode 
     mode = 'automatic'
-    #-d dictionary
+
     dict = None
 
-    #'l:vo:d:A:CKU:B:R:MFI:Zgs'
+    #'l:vo:d:A:Cp:KU:B:R:MFI:Z'
     for o, a in opt_list:
         #print "o=", o, " a=", a
         if o in ('-l', '--l'):
@@ -118,6 +109,13 @@ if __name__ == '__main__':
         if o in ('-C', '--C'):
             charges_to_add = None
             if verbose: print 'do not add charges'
+        if o in ('-p', '--p'):
+            preserve_charge_types+=a
+            preserve_charge_types+=','
+            if verbose: print 'preserve initial charges on ', preserve_charge_types
+        if o in ('-K', '--K'):
+            charges_to_add = 'Kollman'
+            if verbose: print 'add Kollman charges'
         if o in ('-p', '--p'):
             preserve_charge_types+=a
             preserve_charge_types+=','
@@ -143,26 +141,18 @@ if __name__ == '__main__':
         if o in ('-Z', '--Z'):
             inactivate_all_torsions = True
             if verbose: print 'set inactivate_all_torsions to ', inactivate_all_torsions
-        if o in ('-g', '--g'):
-            attach_nonbonded_fragments = True
-            if verbose: print 'set attach_nonbonded_fragments to ', attach_nonbonded_fragments
-        if o in ('-s', '--s'):
-            attach_singletons = True
-            if verbose: print 'set attach_singletons to ', attach_singletons
         if o in ('-h', '--'):
             usage()
             sys.exit()
 
 
     if not  ligand_filename:
-        print 'prepare_ligand4: ligand filename must be specified.'
+        print 'prepare_ligand: ligand filename must be specified.'
         usage()
         sys.exit()
 
-    if attach_singletons:
-        attach_nonbonded_fragments = True
-        if verbose: print "using attach_singletons so attach_nonbonded_fragments also"
-    
+    #what about nucleic acids???
+
     mols = Read(ligand_filename)
     if verbose: print 'read ', ligand_filename
     mol = mols[0]
@@ -177,11 +167,10 @@ if __name__ == '__main__':
                 mol = m
                 if verbose:
                     print "mol set to ", ctr, "th molecule with", len(mol.allAtoms), "atoms"
-    coord_dict = {}
-    for a in mol.allAtoms: coord_dict[a] = a.coords
 
-
+    #possible clean-up???
     mol.buildBondsByDistance()
+
     if charges_to_add is not None:
         preserved = {}
         preserved_types = preserve_charge_types.split(',') 
@@ -193,20 +182,17 @@ if __name__ == '__main__':
                     preserved[a] = [a.chargeSet, a.charge]
 
 
-
     if verbose:
         print "setting up LPO with mode=", mode,
         print "and outputfilename= ", outputfilename
         print "and check_for_fragments=", check_for_fragments
         print "and bonds_to_inactivate=", bonds_to_inactivate
-    LPO = AD4LigandPreparation(mol, mode, repairs, charges_to_add, 
+    LPO = LigandPreparation(mol, mode, repairs, charges_to_add, 
                             cleanup, allowed_bonds, root, 
                             outputfilename=outputfilename,
                             dict=dict, check_for_fragments=check_for_fragments,
                             bonds_to_inactivate=bonds_to_inactivate, 
-                            inactivate_all_torsions=inactivate_all_torsions,
-                            attach_nonbonded_fragments=attach_nonbonded_fragments,
-                            attach_singletons=attach_singletons)
+                            inactivate_all_torsions=inactivate_all_torsions)
     #do something about atoms with too many bonds (?)
     #FIX THIS: could be peptide ligand (???)
     #          ??use isPeptide to decide chargeSet??
@@ -215,25 +201,10 @@ if __name__ == '__main__':
         for atom, chargeList in preserved.items():
             atom._charges[chargeList[0]] = chargeList[1]
             atom.chargeSet = chargeList[0]
-    if verbose: print "returning ", mol.returnCode 
-    bad_list = []
-    for a in mol.allAtoms:
-        if a in coord_dict.keys() and a.coords!=coord_dict[a]: 
-            bad_list.append(a)
-    if len(bad_list):
-        print len(bad_list), ' atom coordinates changed!'    
-        for a in bad_list:
-            print a.name, ":", coord_dict[a], ' -> ', a.coords
-    else:
-        if verbose: print "No change in atomic coordinates"
-    if mol.returnCode!=0: 
-        sys.stderr.write(mol.returnMsg+"\n")
-    sys.exit(mol.returnCode)
 
 
 # To execute this command type:
-# prepare_ligand4.py -l pdb_file -v
-
+# prepare_ligand.py -l pdb_file -v
 
 
 
