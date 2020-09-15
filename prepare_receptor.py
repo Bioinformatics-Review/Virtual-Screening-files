@@ -4,14 +4,14 @@
 #
 # 
 #
-# $Header: /opt/cvs/python/packages/share1.5/AutoDockTools/Utilities24/prepare_receptor4.py,v 1.13 2010/01/25 23:37:14 rhuey Exp $
+# $Header: /opt/cvs/python/packages/share1.5/AutoDockTools/Utilities24/prepare_receptor.py,v 1.6 2007/10/08 18:12:57 rhuey Exp $
 #
 import os 
 
 from MolKit import Read
 import MolKit.molecule
 import MolKit.protein
-from AutoDockTools.MoleculePreparation import AD4ReceptorPreparation
+from AutoDockTools.MoleculePreparation import ReceptorPreparation
 
 
 if __name__ == '__main__':
@@ -21,24 +21,24 @@ if __name__ == '__main__':
 
     def usage():
         "Print helpful, accurate usage statement to stdout."
-        print "Usage: prepare_receptor4.py -r filename"
+        print "Usage: prepare_receptor.py -r filename"
         print
         print "    Description of command..."
-        print "         -r   receptor_filename "
-        print "        supported file types include pdb,mol2,pdbq,pdbqs,pdbqt, possibly pqr,cif"
+        print "         -r   receptor_filename"
         print "    Optional parameters:"
         print "        [-v]  verbose output (default is minimal output)"
-        print "        [-o pdbqt_filename]  (default is 'molecule_name.pdbqt')"
-        print "        [-A]  type(s) of repairs to make: "
+        print "        [-o pdbqs_filename] (default is molecule_name.pdbqs)"
+        print "        [-A]  type(s) of repairs to make:"
         print "             'bonds_hydrogens': build bonds and add hydrogens "
         print "             'bonds': build a single bond from each atom with no bonds to its closest neighbor" 
         print "             'hydrogens': add hydrogens"
         print "             'checkhydrogens': add hydrogens only if there are none already"
         print "             'None': do not make any repairs "
-        print "             (default is 'None')"
+        print "             (default is 'checkhydrogens')"
         print "        [-C]  preserve all input charges ie do not add new charges "
-        print "             (default is addition of gasteiger charges)"
-        print "        [-p]  preserve input charges on specific atom types, eg -p Zn -p Fe"
+        print "             (default is addition of Kollman charges)"
+        print "        [-p]  preserve charges on specific atom types, eg -p F -p S "
+        print "        [-G]  add Gasteiger charges (default is Kollman)"
         print "        [-U]  cleanup type:"
         print "             'nphs': merge charges and remove non-polar hydrogens"
         print "             'lps': merge charges and remove lone pairs"
@@ -51,23 +51,19 @@ if __name__ == '__main__':
         print "              'True': any residue whose name is not in this list:"
         print "                      ['CYS','ILE','SER','VAL','GLN','LYS','ASN', "
         print "                      'PRO','THR','PHE','ALA','HIS','GLY','ASP', "
-        print "                      'LEU', 'ARG', 'TRP', 'GLU', 'TYR','MET', "
-        print "                      'HID', 'HSP', 'HIE', 'HIP', 'CYX', 'CSS']"
-        print "              will be deleted from any chain. "
-        print "              NB: there are no  nucleic acid residue names at all "
-        print "              in the list and no metals. "
+        print "              will be deleted from any chain. NB: there are no "
+        print "              nucleic acid residue names at all in the list. "
         print "             (default is False which means not to do this)"
         print "        [-M]  interactive "
         print "             (default is 'automatic': outputfile is written with no further user input)"
-        print "        [-d dictionary_filename] file to contain receptor summary information"
 
 
     # process command arguments
     try:
-        opt_list, args = getopt.getopt(sys.argv[1:], 'r:vo:A:Cp:U:eM:d:')
+        opt_list, args = getopt.getopt(sys.argv[1:], 'r:vo:A:Cp:GU:eM:')
 
     except getopt.GetoptError, msg:
-        print 'prepare_receptor4.py: %s' %msg
+        print 'prepare_receptor.py: %s' %msg
         usage()
         sys.exit(2)
 
@@ -79,8 +75,9 @@ if __name__ == '__main__':
     verbose = None
     #-A: repairs to make: add bonds and/or hydrogens or checkhydrogens
     repairs = ''
-    #-C default: add gasteiger charges 
-    charges_to_add = 'gasteiger'
+    # default: add Kollman charges for AD3 receptor 
+    charges_to_add = 'Kollman'
+    #-C do not add charges
     #-p preserve charges on specific atom types
     preserve_charge_types=None
     #-U: cleanup by merging nphs_lps, nphs, lps, waters, nonstdres
@@ -91,10 +88,8 @@ if __name__ == '__main__':
     mode = 'automatic'
     #-e delete every nonstd residue from each chain
     delete_single_nonstd_residues = None
-    #-d dictionary
-    dictionary = None
 
-    #'r:vo:A:Cp:U:eMh'
+    #'r:vo:A:Cp:GU:eMh'
     for o, a in opt_list:
         if o in ('-r', '--r'):
             receptor_filename = a
@@ -111,6 +106,9 @@ if __name__ == '__main__':
         if o in ('-C', '--C'):
             charges_to_add = None
             if verbose: print 'do not add charges'
+        if o in ('-G', '--G'):
+            charges_to_add = 'gasteiger'
+            if verbose: print 'add gasteiger charges'
         if o in ('-p', '--p'):
             if not preserve_charge_types:
                 preserve_charge_types = a
@@ -126,16 +124,13 @@ if __name__ == '__main__':
         if o in ('-M', '--M'):
             mode = a
             if verbose: print 'set mode to ', a
-        if o in ('-d', '--d'):
-            dictionary  = a
-            if verbose: print 'set dictionary to ', dictionary
         if o in ('-h', '--'):
             usage()
             sys.exit()
 
 
     if not receptor_filename:
-        print 'prepare_receptor4: receptor filename must be specified.'
+        print 'prepare_receptor: receptor filename must be specified.'
         usage()
         sys.exit()
 
@@ -174,12 +169,11 @@ if __name__ == '__main__':
         print "charges_to_add=", charges_to_add
         print "delete_single_nonstd_residues=", delete_single_nonstd_residues
 
-    RPO = AD4ReceptorPreparation(mol, mode, repairs, charges_to_add, 
-                        cleanup, outputfilename=outputfilename,
-                        preserved=preserved, 
-                        delete_single_nonstd_residues=delete_single_nonstd_residues,
-                        dict=dictionary)    
-
+    RPO = ReceptorPreparation(mol, mode, repairs, charges_to_add, 
+                            cleanup, outputfilename=outputfilename,
+                            preserved=preserved,
+                            delete_single_nonstd_residues=delete_single_nonstd_residues)
+                        
     if charges_to_add is not None:
         #restore any previous charges
         for atom, chargeList in preserved.items():
@@ -188,4 +182,5 @@ if __name__ == '__main__':
 
 
 # To execute this command type:
-# prepare_receptor4.py -r pdb_file -o outputfilename -A checkhydrogens 
+# prepare_receptor.py -r pdb_file -o outputfilename -A checkhydrogens 
+
